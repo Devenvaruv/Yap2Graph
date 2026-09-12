@@ -1,0 +1,74 @@
+{
+  "threads": [
+    {
+      "threadId": "email-thread-auto-44",
+      "subject": "Weekly timesheet reminder",
+      "messages": [
+        {
+          "messageId": "timesheet-reminder",
+          "from": "timesheets@example.com",
+          "to": ["dev@example.com"],
+          "date": "2026-09-07T08:00:00Z",
+          "subject": "Weekly timesheet reminder",
+          "body": "This is an automated reminder: your timesheet for the week of 2026-09-07 is due Friday at 17:00. Please submit it in the HR portal. This reminder repeats weekly."
+        }
+      ]
+    },
+    {
+      "threadId": "email-thread-231",
+      "subject": "Duplicate-charge fix is live",
+      "messages": [
+        {
+          "messageId": "webhook-shipped",
+          "from": "dev@example.com",
+          "to": ["payments-team@example.com"],
+          "date": "2026-09-09T09:30:00Z",
+          "subject": "Duplicate-charge fix is live",
+          "body": "Hey team — the idempotent webhook handler shipped to production yesterday evening. Before: every Stripe retry re-processed the payment and roughly 3 customers a day got double-charged. After 24h of monitoring: zero duplicate charges, and the two open customer complaints have been refunded and closed.\n\nI'll keep the duplicate-charge alert on for the rest of the week, but I consider this done. Next time we touch webhooks we should reuse the same processed_events pattern."
+        }
+      ]
+    },
+    {
+      "threadId": "email-thread-auto-61",
+      "subject": "License renewal receipt",
+      "messages": [
+        {
+          "messageId": "license-renewal",
+          "from": "billing@jetbrains.example.com",
+          "to": ["dev@example.com"],
+          "date": "2026-09-11T07:45:00Z",
+          "subject": "License renewal receipt",
+          "body": "Your JetBrains All Products Pack license has been automatically renewed for 12 months. Amount charged: $289.00 USD. This is an automated receipt; please keep it for your records."
+        }
+      ]
+    },
+    {
+      "threadId": "email-thread-245",
+      "subject": "Feed latency fixed",
+      "messages": [
+        {
+          "messageId": "feed-latency",
+          "from": "dev@example.com",
+          "to": ["mobile-team@example.com", "eng-leads@example.com"],
+          "date": "2026-09-11T10:00:00Z",
+          "subject": "Feed latency fixed",
+          "body": "The feed cache layer shipped to production on Thursday. Before: p95 of 800ms on every feed request while the backend re-joined the friend graph. After 48h: p95 is stable at 90ms with a 97% cache hit rate, and the mobile team reports feed abandonment is down and average session length is up 8%.\n\nNext step if we want more: edge caching for logged-out feeds next quarter. For now I'm calling this one done."
+        }
+      ]
+    },
+    {
+      "threadId": "email-thread-251",
+      "subject": "Runner rollout delayed",
+      "messages": [
+        {
+          "messageId": "ci-runner-delay",
+          "from": "infra-lead@example.com",
+          "to": ["dev@example.com"],
+          "date": "2026-09-11T16:45:00Z",
+          "subject": "Runner rollout delayed",
+          "body": "Heads up — the self-hosted runner rollout slipped to next sprint; the cluster capacity we earmarked got reallocated to the search reindex. Your CI migration stays on hold until the runners land. I'd suggest picking it back up the Monday after next; no action is needed from you until then."
+        }
+      ]
+    }
+  ]
+}

@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ingest": "tsx scripts/ingest.ts",
+    "e2e": "vitest run src/lib/__tests__/ingestion.e2e.test.ts",
+    "cognee:check": "tsx scripts/cognee-check.ts"
   },
   "dependencies": {
     "next": "16.3.5",
@@ -17,9 +20,9 @@
     "zod": "^4.6.2"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.0.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@testing-library/dom": "^10.0.0",
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -27,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "jsdom": "^29.1.1",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vite": "^8.0.0",
     "vitest": "^5.0.0"

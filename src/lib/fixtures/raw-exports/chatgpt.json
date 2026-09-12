@@ -1,0 +1,117 @@
+{
+  "conversations": [
+    {
+      "id": "webhook-retry",
+      "title": "Duplicate charges from Stripe webhook retries",
+      "create_time": 1788776100,
+      "messages": [
+        {
+          "author": { "role": "user" },
+          "content": "Our billing-api keeps charging some customers twice. I traced it to Stripe retrying failed webhooks — every retry re-runs the handler and processes the same payment event again. Right now roughly 3 customers a day get double-charged.",
+          "create_time": 1788776100
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "The handler isn't idempotent. Options: (1) use Stripe's idempotency keys on the charge call, (2) a processed_events table with a unique constraint on the Stripe event id, (3) make the handler side-effect-free and reconcile later.",
+          "create_time": 1788776220
+        },
+        {
+          "author": { "role": "user" },
+          "content": "Which is simplest to ship this week?",
+          "create_time": 1788776280
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "Option 2 — check the Stripe event id against processed_events inside the same Postgres transaction as the charge insert. Retries then become no-ops. You'll want a migration for the unique index and integration tests that replay the same event twice.",
+          "create_time": 1788776340
+        },
+        {
+          "author": { "role": "user" },
+          "content": "OK, going with the processed_events check. So today retries re-process payments and double-charge customers; after this change retries should be safely ignored. Draft the migration and the test plan for me.",
+          "create_time": 1788776400
+        }
+      ]
+    },
+    {
+      "id": "feed-cache",
+      "title": "Feed API p95 at 800ms — Redis cache or materialized view?",
+      "create_time": 1788865200,
+      "messages": [
+        {
+          "author": { "role": "user" },
+          "content": "The mobile-backend feed endpoint is slow — p95 latency is around 800ms. Profiling shows an N+1 pattern: every feed request re-joins activities, likes, and comments for the whole friend graph. What are my options?",
+          "create_time": 1788865320
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "Two realistic ones: (1) a Redis cache in front of the composed feed with a short TTL and write-through invalidation on new posts and comments, (2) a Postgres materialized view refreshed on a schedule. Given the bursty comment write pattern, option 1 gives better staleness behavior with less schema surgery.",
+          "create_time": 1788865500
+        },
+        {
+          "author": { "role": "user" },
+          "content": "Let's do Redis. What TTL?",
+          "create_time": 1788865680
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "60 seconds covers the hot path; invalidate explicitly on post and comment writes so authors see their own content immediately. Today every feed request recomputes the full join — with the cache, only the first request per minute pays that cost.",
+          "create_time": 1788865740
+        },
+        {
+          "author": { "role": "user" },
+          "content": "OK — Redis, 60s TTL, explicit invalidation on writes. Sketch the module boundaries and the load test we should run before shipping.",
+          "create_time": 1788865800
+        }
+      ]
+    },
+    {
+      "id": "reword-request",
+      "title": "Friendlier way to decline a meeting invite",
+      "create_time": 1788884400,
+      "messages": [
+        {
+          "author": { "role": "user" },
+          "content": "Give me three friendlier rewordings of this Slack message: \"Can't make the sync, send notes.\"",
+          "create_time": 1788884460
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "1) \"Sadly I can't join the sync — could you share the notes afterwards?\" 2) \"I'll have to skip this one — mind forwarding the notes?\" 3) \"Can't make it this time, but I'd love to catch up on the notes!\"",
+          "create_time": 1788884500
+        },
+        {
+          "author": { "role": "user" },
+          "content": "Second one. Thanks.",
+          "create_time": 1788884520
+        }
+      ]
+    },
+    {
+      "id": "ci-migration",
+      "title": "Migrating CI from CircleCI to GitHub Actions — strategy",
+      "create_time": 1788944400,
+      "messages": [
+        {
+          "author": { "role": "user" },
+          "content": "platform-infra pays about $1.9k/month for CircleCI across 18 jobs and the bill keeps climbing. I want to move to GitHub Actions. Cloud runners or self-hosted?",
+          "create_time": 1788944520
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "With your existing k8s cluster, self-hosted runners on spot nodes cost roughly a quarter of cloud runners at your job volume. The catch: runner registration tokens need infra approval, and you should migrate job-by-job while keeping CircleCI running in parallel.",
+          "create_time": 1788944700
+        },
+        {
+          "author": { "role": "user" },
+          "content": "Self-hosted it is. Today every CI run happens on CircleCI; the goal is all 18 jobs on GitHub Actions with the CircleCI project archived. Give me a migration order that keeps deploys safe.",
+          "create_time": 1788944820
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "Migrate lint, unit, and integration jobs first — cheap to verify — and leave the 6 deploy jobs for last since they need the runner tokens. Keep both CIs green on the same commit until the final cutover.",
+          "create_time": 1788944940
+        }
+      ]
+    }
+  ]
+}

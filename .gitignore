@@ -13,6 +13,9 @@
 # testing
 /coverage
 
+# local pipeline artifacts (activity store + ingestion cache)
+/data
+
 # next.js
 /.next/
 /out/
