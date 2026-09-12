@@ -1,0 +1,32 @@
+{
+  "threads": [
+    {
+      "threadId": "email-thread-231",
+      "subject": "Duplicate-charge fix is live",
+      "messages": [
+        {
+          "messageId": "msg-1001",
+          "from": "dev@example.com",
+          "to": ["payments-team@example.com"],
+          "date": "2026-09-09T09:30:00Z",
+          "subject": "Duplicate-charge fix is live",
+          "body": "Hey team — the idempotent webhook handler shipped to production yesterday evening. Before: every Stripe retry re-processed the payment and roughly 3 customers a day got double-charged. After 24h of monitoring: zero duplicate charges, and the two open customer complaints have been refunded and closed.\n\nI'll keep the duplicate-charge alert on for the rest of the week, but I consider this done. Next time we touch webhooks we should reuse the same processed_events pattern."
+        }
+      ]
+    },
+    {
+      "threadId": "email-thread-auto-44",
+      "subject": "Reminder: submit your timesheet by Friday 17:00",
+      "messages": [
+        {
+          "messageId": "msg-2001",
+          "from": "timesheets@example.com",
+          "to": ["dev@example.com"],
+          "date": "2026-09-07T08:00:00Z",
+          "subject": "Weekly timesheet reminder",
+          "body": "This is an automated reminder: your timesheet for the week of 2026-09-07 is due Friday at 17:00. Please submit it in the HR portal. This reminder repeats weekly."
+        }
+      ]
+    }
+  ]
+}

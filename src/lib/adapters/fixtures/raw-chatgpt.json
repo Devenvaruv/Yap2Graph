@@ -1,0 +1,36 @@
+{
+  "conversations": [
+    {
+      "id": "chatgpt-webhook-retry",
+      "title": "Duplicate charges from Stripe webhook retries",
+      "create_time": 1788833700,
+      "messages": [
+        {
+          "author": { "role": "user" },
+          "content": "Our billing-api keeps charging some customers twice. I traced it to Stripe retrying failed webhooks — every retry re-runs the handler and processes the same payment event again. Right now roughly 3 customers a day get double-charged.",
+          "create_time": 1788833700
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "The handler isn't idempotent. Options: (1) use Stripe's idempotency keys on the charge call, (2) a processed_events table with a unique constraint on the Stripe event id, (3) make the handler side-effect-free and reconcile later.",
+          "create_time": 1788833720
+        },
+        {
+          "author": { "role": "user" },
+          "content": "Which is simplest to ship this week?",
+          "create_time": 1788833800
+        },
+        {
+          "author": { "role": "assistant" },
+          "content": "Option 2 — check the Stripe event id against processed_events inside the same Postgres transaction as the charge insert. Retries then become no-ops. You'll want a migration for the unique index and integration tests that replay the same event twice.",
+          "create_time": 1788833820
+        },
+        {
+          "author": { "role": "user" },
+          "content": "OK, going with the processed_events check. So today retries re-process payments and double-charge customers; after this change retries should be safely ignored. Draft the migration and the test plan for me.",
+          "create_time": 1788833900
+        }
+      ]
+    }
+  ]
+}
