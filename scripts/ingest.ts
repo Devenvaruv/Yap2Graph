@@ -1,18 +1,23 @@
-import { StubCognee } from "../src/lib/cognee";
+import { RealCogneeClient } from "../src/lib/cognee";
 import { CannedPipelineLlm } from "../src/lib/fixtures/canned-extraction";
 import { fixtureRawExports } from "../src/lib/fixtures/raw-exports";
 import { runIngestion } from "../src/lib/ingestion";
 
+const LOCAL_COGNEE_CACHE_PATH = "data/local-cognee-ingestion-cache.json";
+
 /**
- * Deterministic end-to-end ingest of the raw fixture exports: adapters →
- * map pass → merge pass → data/activities.json, plus the stubbed Cognee seam.
- * No network, no API keys — the LLM is canned and Cognee is a stub. A second
- * run with unchanged inputs is a cache no-op.
+ * Ingest fixture exports through the local Cognee service. Map and merge use
+ * canned responses, while Cognee builds and stores the local knowledge graph.
  */
 async function main(): Promise<void> {
   const llm = new CannedPipelineLlm();
-  const cognee = new StubCognee();
-  const result = await runIngestion(fixtureRawExports, { llm, cognee });
+  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8000";
+  const cognee = new RealCogneeClient({ apiUrl });
+  const result = await runIngestion(fixtureRawExports, {
+    llm,
+    cognee,
+    cachePath: LOCAL_COGNEE_CACHE_PATH,
+  });
 
   if (result.skipped) {
     console.log("Ingestion skipped — inputs unchanged (cache hit).");

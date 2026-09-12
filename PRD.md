@@ -79,7 +79,7 @@ The core demo: the **exact same 7 days of memory** generates a standup, a manage
 ### Stack & runtime
 
 - **TypeScript everywhere.** Next.js (App Router) as the single full-stack app: React UI plus server-side pipeline logic in one codebase.
-- **Cognee runs as its Docker REST service** (Cognee is a Python library; the TS pipeline calls its REST API for add / cognify / search). Default storage backends (NetworkX + LanceDB) inside the container — no Neo4j, no Qdrant, no external databases.
+- **Cognee runs locally through the uv-managed Python service in `cognee-service/`** (Cognee is a Python library; the TS pipeline calls its localhost REST API for add / cognify / search). Default local storage backends (NetworkX + LanceDB) persist under `cognee-service/.cognee/` — no Neo4j, Qdrant, remote service, or external database.
 - **OpenAI via the TS SDK.** Small model (gpt-4o-mini class) for map extraction, merge, and relevance scoring; larger model for final generation; `text-embedding-3-small` for embeddings. Single `OPENAI_API_KEY` in `.env`.
 
 ### Source adapters

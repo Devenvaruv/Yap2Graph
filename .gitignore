@@ -16,6 +16,11 @@
 # local pipeline artifacts (activity store + ingestion cache)
 /data
 
+# local Cognee service environment and storage
+/cognee-service/.venv/
+/cognee-service/.cognee/
+/cognee-service/__pycache__/
+
 # next.js
 /.next/
 /out/

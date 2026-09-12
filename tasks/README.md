@@ -13,7 +13,7 @@ Source: `PRD.md` (status: ready-for-agent). No issue tracker is configured yet; 
 | M3 — Ingestion & activity layer | [T05](T05-map-pass.md) Implement the map pass: candidate events per source document | T02, T04 |
 | | [T06](T06-merge-pass.md) Implement the merge pass: deduplicated activities with evidence and before/after state | T05 |
 | | [T07](T07-ingestion-orchestration.md) Orchestrate the cached ingestion pipeline end-to-end with a stubbed Cognee | T03, T05, T06 |
-| | [T08](T08-cognee-integration.md) Integrate the real Cognee REST service (add, cognify, search) | T07 |
+| | [T08](T08-cognee-integration.md) Integrate the local uv-managed Cognee service (add, cognify, search) | T07 |
 | M4 — Intent & query pipeline | [T09](T09-intent-profiles.md) Define the six intent reference profiles as validated constants | T02 |
 | | [T10](T10-relevance-matching.md) Implement hybrid relevance matching with surfaced per-activity scores | T06, T09 |
 | | [T11](T11-evidence-retrieval.md) Retrieve evidence from Cognee seeded per selected activity | T07, T10 |

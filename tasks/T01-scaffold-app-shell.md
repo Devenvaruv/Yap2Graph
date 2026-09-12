@@ -23,7 +23,7 @@ PRD "UI" section requires: an intent picker with the six intents (standup, manag
 - Assumption: **Vitest** as the test runner (TS-native, works well with Next without extra config). If a different runner is already configured, follow it — nothing is configured yet.
 - Suggested layout (light, not prescriptive): `src/app` for routes, `src/components` for UI, `src/lib` for pipeline logic.
 - The six intent options and five time-range options should live in one shared constant module so T09's profiles and the picker never drift apart. Placeholder profiles keyed by `key` are fine here; T09 replaces them with full validated profiles.
-- Create `.env.example` with `OPENAI_API_KEY` and `COGNEE_API_URL` (Cognee Docker REST service; T08 uses it). Do not commit real keys.
+- Create `.env.example` with `OPENAI_API_KEY` and `COGNEE_API_URL` (the uv-managed local Cognee service; T08 uses it). Do not commit real keys.
 - Selection state (intent + time range) can be client-side for now; T13 wires it to the query API.
 - No styling framework is mandated by the PRD; keep it minimal — the user owns layout and demo polish (PRD "Out of scope": UI polish beyond required capabilities).
 

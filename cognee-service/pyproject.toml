@@ -1,0 +1,10 @@
+[project]
+name = "yap2graph-cognee-service"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "cognee>=1.5.4",
+    "fastapi>=0.141.1",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.52.4",
+]

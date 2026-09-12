@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "cognee-service/.venv/**",
+    "cognee-service/.cognee/**",
   ]),
 ]);
 
