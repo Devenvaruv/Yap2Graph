@@ -162,4 +162,80 @@ describe("CodexConnector", () => {
     expect(parsed.sessions[0].transcript[0].role).toBe("developer");
     expect(parsed.sessions[0].transcript[0].content).toBe("Refactor the parser module");
   });
+
+  it("handles current Codex envelope records", async () => {
+    const envelopeDir = path.join(tmpDir, "envelope-sessions");
+    await fs.mkdir(envelopeDir);
+
+    const envelopeJsonl = [
+      JSON.stringify({
+        type: "session_meta",
+        timestamp: "2026-09-12T15:00:00Z",
+        payload: {
+          cwd: path.join("C:", "Documents", "Code", "Yap2Graph"),
+          session_id: "session-envelope",
+        },
+      }),
+      JSON.stringify({
+        type: "event_msg",
+        timestamp: "2026-09-12T15:01:00Z",
+        payload: {
+          type: "user_message",
+          message: "Why is live ingestion failing?",
+        },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        timestamp: "2026-09-12T15:02:00Z",
+        payload: {
+          type: "message",
+          role: "assistant",
+          content: [
+            {
+              type: "output_text",
+              text: "The connector needs to parse nested payload records.",
+            },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "event_msg",
+        timestamp: "2026-09-12T15:03:00Z",
+        payload: {
+          type: "agent_message",
+          message: "Patched the parser and added coverage.",
+        },
+      }),
+    ].join("\n");
+
+    await fs.writeFile(
+      path.join(envelopeDir, "rollout-session-envelope.jsonl"),
+      envelopeJsonl,
+    );
+
+    const connector = new CodexConnector({ sessionsDir: envelopeDir });
+    const raw = await connector.fetch();
+    const parsed = JSON.parse(raw);
+
+    expect(parsed.sessions).toHaveLength(1);
+    expect(parsed.sessions[0].repo).toBe("Yap2Graph");
+    expect(parsed.sessions[0].task).toBe("Why is live ingestion failing?");
+    expect(parsed.sessions[0].transcript).toEqual([
+      {
+        role: "user",
+        content: "Why is live ingestion failing?",
+        timestamp: "2026-09-12T15:01:00Z",
+      },
+      {
+        role: "agent",
+        content: "The connector needs to parse nested payload records.",
+        timestamp: "2026-09-12T15:02:00Z",
+      },
+      {
+        role: "agent",
+        content: "Patched the parser and added coverage.",
+        timestamp: "2026-09-12T15:03:00Z",
+      },
+    ]);
+  });
 });

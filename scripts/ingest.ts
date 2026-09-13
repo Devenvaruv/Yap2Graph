@@ -11,7 +11,7 @@ const LOCAL_COGNEE_CACHE_PATH = "data/local-cognee-ingestion-cache.json";
  */
 async function main(): Promise<void> {
   const llm = new CannedPipelineLlm();
-  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8000";
+  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8010";
   const cognee = new RealCogneeClient({ apiUrl });
   const result = await runIngestion(fixtureRawExports, {
     llm,

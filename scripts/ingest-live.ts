@@ -1,35 +1,105 @@
 import "dotenv/config";
-import { CodingAgentAdapter } from "../src/lib/adapters";
-import { ChatGptAdapter } from "../src/lib/adapters";
-import { EmailAdapter } from "../src/lib/adapters";
 import { CodexConnector } from "../src/lib/connectors/codex-connector";
 import { GmailConnector } from "../src/lib/connectors/gmail-connector";
 import { ChatGptConnector } from "../src/lib/connectors/chatgpt-connector";
 import { RealCogneeClient } from "../src/lib/cognee";
-import { CannedPipelineLlm } from "../src/lib/fixtures/canned-extraction";
-import { runIngestion, type RawExport } from "../src/lib/ingestion";
+import {
+  defaultAdapters,
+  hashDocument,
+  hashDocuments,
+  loadIngestionCache,
+  saveIngestionCache,
+  type RawExport,
+} from "../src/lib/ingestion";
+import type { SourceDocument } from "../src/lib/schemas";
 
-const LOCAL_CACHE_PATH = "data/live-ingestion-cache.json";
+const LOCAL_CACHE_PATH = "data/live-cognee-ingestion-cache.json";
+const CHATGPT_ACTIVITY_DAYS = 2;
+
+function isoDateDaysAgo(daysAgo: number, from: Date = new Date()): string {
+  const date = new Date(from);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  return date.toISOString().slice(0, 10);
+}
+
+function chatGptActivityDates(): string[] {
+  const explicitDate = process.env.CHATGPT_ACTIVITY_DATE;
+  if (explicitDate) return [explicitDate];
+  return Array.from({ length: CHATGPT_ACTIVITY_DAYS }, (_, daysAgo) =>
+    isoDateDaysAgo(daysAgo),
+  );
+}
+
+async function ingestDocumentsToCognee(
+  rawExports: readonly RawExport[],
+  cognee: RealCogneeClient,
+): Promise<{
+  documents: SourceDocument[];
+  addedToCognee: SourceDocument[];
+  cognified: boolean;
+}> {
+  const adapters = defaultAdapters();
+  const cache = await loadIngestionCache(LOCAL_CACHE_PATH);
+  const documents: SourceDocument[] = [];
+  const currentInputNames = new Set<string>();
+
+  for (const input of rawExports) {
+    currentInputNames.add(input.name);
+    const inputDocuments = adapters[input.sourceType].adapt(input.raw);
+    documents.push(...inputDocuments);
+    cache.inputs[input.name] = {
+      inputHash: hashDocuments(inputDocuments),
+      documentIds: inputDocuments.map((document) => document.id),
+      candidates: [],
+    };
+  }
+
+  for (const name of Object.keys(cache.inputs)) {
+    if (!currentInputNames.has(name)) delete cache.inputs[name];
+  }
+
+  const docsToAdd = documents.filter(
+    (document) => cache.addedDocuments[document.id] !== hashDocument(document),
+  );
+
+  let cognified = false;
+  if (docsToAdd.length > 0) {
+    await cognee.add(docsToAdd);
+    await cognee.cognify();
+    cognified = true;
+    for (const document of docsToAdd) {
+      cache.addedDocuments[document.id] = hashDocument(document);
+    }
+  }
+
+  await saveIngestionCache(cache, LOCAL_CACHE_PATH);
+
+  return { documents, addedToCognee: docsToAdd, cognified };
+}
 
 async function main(): Promise<void> {
-  const llm = new CannedPipelineLlm();
-  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8000";
+  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8010";
   const cognee = new RealCogneeClient({ apiUrl });
 
   const rawExports: RawExport[] = [];
 
   const databaseUrl = process.env.DATABASE_URL;
-  const activityDate = process.env.CHATGPT_ACTIVITY_DATE ?? new Date().toISOString().slice(0, 10);
   if (databaseUrl) {
-    const chatgpt = new ChatGptConnector({ databaseUrl, date: activityDate });
-    try {
-      const chatgptRaw = await chatgpt.fetch();
-      rawExports.push({ name: `chatgpt-${activityDate}`, sourceType: "chatgpt", raw: chatgptRaw });
-      console.log(`ChatGPT daily activity fetched (${activityDate}).`);
-    } catch (err) {
-      console.warn(
-        `ChatGPT connector skipped: ${err instanceof Error ? err.message : String(err)}`,
-      );
+    for (const activityDate of chatGptActivityDates()) {
+      const chatgpt = new ChatGptConnector({ databaseUrl, date: activityDate });
+      try {
+        const chatgptRaw = await chatgpt.fetch();
+        rawExports.push({
+          name: `chatgpt-${activityDate}`,
+          sourceType: "chatgpt",
+          raw: chatgptRaw,
+        });
+        console.log(`ChatGPT daily activity fetched (${activityDate}).`);
+      } catch (err) {
+        console.warn(
+          `ChatGPT connector skipped (${activityDate}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   } else {
     console.log("ChatGPT connector skipped: DATABASE_URL not set.");
@@ -59,8 +129,8 @@ async function main(): Promise<void> {
     if (!gmail.getRefreshToken()) {
       console.log("No Gmail refresh token — starting interactive OAuth...");
       const token = await gmail.authenticateInteractive();
-      console.log(`Refresh token obtained: ${token.slice(0, 10)}...`);
-      console.log("Set GMAIL_REFRESH_TOKEN in .env for non-interactive runs.");
+      console.log("Refresh token obtained. Add this to .env for non-interactive runs:");
+      console.log(`GMAIL_REFRESH_TOKEN=${token}`);
     }
 
     try {
@@ -82,30 +152,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  const result = await runIngestion(rawExports, {
-    llm,
-    cognee,
-    cachePath: LOCAL_CACHE_PATH,
-    adapters: {
-      coding_agent: new CodingAgentAdapter(),
-      email: new EmailAdapter(),
-      chatgpt: new ChatGptAdapter(),
-    },
-  });
-
-  if (result.skipped) {
-    console.log("Ingestion skipped — inputs unchanged (cache hit).");
-    console.log(`Activities in store: ${result.activities.length}`);
-    return;
-  }
+  const result = await ingestDocumentsToCognee(rawExports, cognee);
 
   console.log("Ingestion complete.");
   console.log(`Documents: ${result.documents.length}`);
-  console.log(`Activities: ${result.activities.length}`);
-  for (const activity of result.activities) {
-    console.log(
-      `  [${activity.status}] ${activity.title} (${activity.project}, evidence: ${activity.evidenceIds.length})`,
-    );
+  console.log(
+    `Cognee: added ${result.addedToCognee.length} document(s), cognified: ${result.cognified ? "yes" : "no"}`,
+  );
+  if (result.addedToCognee.length === 0) {
+    console.log("Cognee ingestion skipped - documents unchanged (cache hit).");
   }
 }
 

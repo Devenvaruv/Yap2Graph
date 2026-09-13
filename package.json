@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "eslint",
     "test": "vitest run",
     "ingest": "tsx scripts/ingest.ts",
     "ingest:live": "tsx scripts/ingest-live.ts",
     "e2e": "vitest run src/lib/__tests__/ingestion.e2e.test.ts",
     "cognee:sync": "uv --directory cognee-service sync",
-    "cognee:serve": "uv --directory cognee-service run --env-file .env uvicorn app:app --host 127.0.0.1 --port 8000",
+    "cognee:serve": "uv --directory cognee-service run --env-file .env uvicorn app:app --host 127.0.0.1 --port 8010",
     "cognee:check": "tsx scripts/cognee-check.ts"
   },
   "dependencies": {

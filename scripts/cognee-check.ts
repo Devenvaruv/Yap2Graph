@@ -1,6 +1,6 @@
 import { RealCogneeClient } from "../src/lib/cognee";
 
-const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8000";
+const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8010";
 
 const client = new RealCogneeClient({ apiUrl });
 

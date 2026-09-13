@@ -22,9 +22,11 @@ os.environ.setdefault("COGNEE_TRACING_ENABLED", "false")
 import cognee
 from cognee import SearchType
 from cognee.tasks.ingestion.data_item import DataItem
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from cognee.api.v1.visualize.visualize import visualize_graph, visualize_graph_json
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Yap2Graph local Cognee service", version="0.1.0")
@@ -178,3 +180,49 @@ async def search(request: SearchRequest) -> list[dict[str, object]]:
         raise HTTPException(status_code=500, detail=f"Cognee search failed: {error}") from error
 
     return [{"search_result": jsonable_encoder(result)} for result in results]
+
+
+@app.get("/api/v1/graph")
+async def graph(
+    dataset: str = "main_dataset",
+    full: bool = True,
+    max_nodes: int = Query(default=5000, ge=1, le=20000),
+) -> dict[str, object]:
+    try:
+        return jsonable_encoder(
+            await visualize_graph_json(
+                dataset=dataset,
+                full=full,
+                max_nodes=max_nodes,
+                include_session_events=False,
+            )
+        )
+    except Exception as error:
+        logger.exception("Cognee graph export failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cognee graph export failed: {error}",
+        ) from error
+
+
+@app.get("/api/v1/visualize", response_class=HTMLResponse)
+async def visualize(
+    dataset: str = "main_dataset",
+    full: bool = True,
+    max_nodes: int = Query(default=5000, ge=1, le=20000),
+) -> HTMLResponse:
+    try:
+        html = await visualize_graph(
+            dataset=dataset,
+            full=full,
+            max_nodes=max_nodes,
+            include_session_events=False,
+        )
+    except Exception as error:
+        logger.exception("Cognee visualization failed")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Cognee visualization failed: {error}",
+        ) from error
+
+    return HTMLResponse(content=html)

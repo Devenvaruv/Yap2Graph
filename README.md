@@ -21,7 +21,7 @@ npm run cognee:serve
 npm run cognee:check
 ```
 
-The service listens on `http://localhost:8000` by default. Set `COGNEE_API_URL` in the root `.env` to use another local address.
+The Yap2Graph Cognee service listens on `http://localhost:8010` by default. Set `COGNEE_API_URL` in the root `.env` to use another local address. This is the only Cognee backend this project uses.
 
 ## Run locally
 
@@ -31,7 +31,30 @@ cp .env.example .env
 npm run dev
 ```
 
-Open <http://localhost:3000>.
+Open <http://localhost:3001>.
+
+The app uses port 3001 so the Gmail live-ingestion OAuth callback can keep
+using `http://localhost:3000/auth/google/callback`.
+
+Local port map:
+
+- Yap2Graph app: `http://localhost:3001`
+- Yap2Graph Cognee API: `http://localhost:8010`
+- Yap2Graph mind map: `http://localhost:3001/mindmap`
+- Gmail OAuth callback: `http://localhost:3000/auth/google/callback`
+
+The mind map uses the repo-local Cognee API/storage directly, so it shows the
+same `main_dataset` populated by `npm run ingest:live`. Direct graph endpoints
+are also available:
+
+```text
+http://localhost:8010/api/v1/visualize?dataset=main_dataset&full=true
+http://localhost:8010/api/v1/graph?dataset=main_dataset&full=true
+```
+
+Do not use `cognee-cli -ui` for this project. It starts a separate Cognee
+instance with separate storage, which makes the brain look empty. Use
+`/mindmap` instead.
 
 ## Ingest the fixture corpus
 

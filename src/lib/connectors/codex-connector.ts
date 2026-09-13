@@ -98,6 +98,7 @@ export class CodexConnector {
     let firstTimestamp: string | null = null;
     let lastTimestamp: string | null = null;
     let task = "";
+    let repo = "unknown";
 
     for (const line of lines) {
       let record: Record<string, unknown>;
@@ -113,6 +114,9 @@ export class CodexConnector {
         lastTimestamp = ts;
       }
 
+      const inferredRepo = this.extractRepo(record);
+      if (inferredRepo) repo = inferredRepo;
+
       const role = this.extractRole(record);
       const text = this.extractContent(record);
       if (role && text) {
@@ -126,6 +130,9 @@ export class CodexConnector {
       if (!task && record.type === "task") {
         task = String(record.description ?? record.task ?? "");
       }
+      if (!task && role === "user" && text) {
+        task = this.summarizeTask(text);
+      }
     }
 
     if (transcript.length === 0) return null;
@@ -136,7 +143,7 @@ export class CodexConnector {
     return {
       sessionId: `codex-${sessionId}`,
       agent: "codex-cli",
-      repo: this.inferRepo(filePath),
+      repo: repo === "unknown" ? this.inferRepo(filePath) : repo,
       startTime: fallbackTs,
       endTime: lastTimestamp ?? fallbackTs,
       task: task || `Codex session ${sessionId.slice(0, 8)}`,
@@ -154,6 +161,12 @@ export class CodexConnector {
     if (typeof record.timestamp === "number") {
       return new Date(record.timestamp * 1000).toISOString();
     }
+    const payload = this.asRecord(record.payload);
+    if (payload) {
+      if (typeof payload.timestamp === "string") return payload.timestamp;
+      if (typeof payload.started_at === "string") return payload.started_at;
+      if (typeof payload.completed_at === "string") return payload.completed_at;
+    }
     return null;
   }
 
@@ -166,6 +179,14 @@ export class CodexConnector {
       typeof (record.author as Record<string, unknown>).role === "string"
     ) {
       return (record.author as Record<string, string>).role;
+    }
+    const payload = this.asRecord(record.payload);
+    if (payload) {
+      if (payload.type === "user_message") return "user";
+      if (payload.type === "agent_message") return "agent";
+      if (payload.type === "message" && typeof payload.role === "string") {
+        return this.normalizeRole(payload.role);
+      }
     }
     if (typeof record.type === "string") {
       const typeMap: Record<string, string> = {
@@ -195,7 +216,56 @@ export class CodexConnector {
         )
         .join("\n");
     }
+    const payload = this.asRecord(record.payload);
+    if (payload) {
+      if (typeof payload.message === "string") return payload.message;
+      if (typeof payload.text === "string") return payload.text;
+      if (Array.isArray(payload.content)) {
+        return this.extractContentParts(payload.content);
+      }
+      if (Array.isArray(payload.text_elements)) {
+        return this.extractContentParts(payload.text_elements);
+      }
+    }
     return null;
+  }
+
+  private extractRepo(record: Record<string, unknown>): string | null {
+    const payload = this.asRecord(record.payload);
+    if (!payload || typeof payload.cwd !== "string") return null;
+    return path.basename(payload.cwd) || payload.cwd;
+  }
+
+  private extractContentParts(parts: unknown[]): string | null {
+    const text = parts
+      .map((part) => {
+        if (typeof part === "string") return part;
+        const partRecord = this.asRecord(part);
+        if (!partRecord) return "";
+        if (typeof partRecord.text === "string") return partRecord.text;
+        if (typeof partRecord.content === "string") return partRecord.content;
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    return text || null;
+  }
+
+  private normalizeRole(role: string): string {
+    if (role === "assistant") return "agent";
+    return role;
+  }
+
+  private summarizeTask(text: string): string {
+    const firstLine = text.trim().split(/\r?\n/, 1)[0] ?? "";
+    return firstLine.length > 100 ? `${firstLine.slice(0, 97)}...` : firstLine;
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : null;
   }
 
   private inferRepo(filePath: string): string {

@@ -15,7 +15,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 async function connectCognee(): Promise<CogneeClient> {
-  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8000";
+  const apiUrl = process.env.COGNEE_API_URL ?? "http://localhost:8010";
   const real = new RealCogneeClient({ apiUrl });
   try {
     await withTimeout(real.healthCheck(), COGNEE_HEALTH_TIMEOUT_MS);

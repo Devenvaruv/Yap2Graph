@@ -1,6 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, test } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import Home from "@/app/page";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("home page", () => {
   test("shows the six intents", () => {
@@ -29,8 +33,8 @@ describe("home page", () => {
   test("renders labeled placeholder panes", () => {
     render(<Home />);
 
-    expect(screen.getByRole("heading", { name: "Output" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Activities used" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Draft" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sources used" })).toBeInTheDocument();
   });
 
   test("reflects intent and time-range selection", () => {
@@ -60,5 +64,30 @@ describe("home page", () => {
       "aria-pressed",
       "true",
     );
+  });
+
+  test("generates a draft from the selected profile", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          title: "Standup draft",
+          markdown: "## Completed\n- Shipped the Cognee mind map.",
+          sources: [{ documentId: "chatgpt-daily-2026-09-12", excerpt: "Mind map shipped." }],
+          usedModel: false,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    render(<Home />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate draft" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Standup draft")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Shipped the Cognee mind map/)).toBeInTheDocument();
+    expect(screen.getByText("chatgpt-daily-2026-09-12")).toBeInTheDocument();
   });
 });
