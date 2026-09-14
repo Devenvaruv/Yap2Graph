@@ -7,7 +7,13 @@ Intent-aware personal research & memory system (hackathon prototype). See `PRD.m
 Cognee runs only on this machine through the uv-managed FastAPI service in `cognee-service/`. Its data remains in `cognee-service/.cognee/`.
 
 1. Copy `cognee-service/.env.example` to `cognee-service/.env`.
-2. Set `LLM_API_KEY` and `EMBEDDING_API_KEY` in that file. Cognee needs these provider credentials to build and query its local graph.
+2. Make sure Ollama is running locally and the two required models are present:
+
+```bash
+ollama pull qwen3:4b-instruct
+ollama pull nomic-embed-text
+```
+
 3. Synchronize the Python environment and start the service in separate terminals:
 
 ```bash
@@ -32,6 +38,9 @@ npm run dev
 ```
 
 Open <http://localhost:3001>.
+
+The Next.js app uses Ollama directly through `OLLAMA_BASE_URL`,
+`OLLAMA_CHAT_MODEL`, and `OLLAMA_EMBEDDING_MODEL`. No OpenAI API key is needed.
 
 The app uses port 3001 so the Gmail live-ingestion OAuth callback can keep
 using `http://localhost:3000/auth/google/callback`.

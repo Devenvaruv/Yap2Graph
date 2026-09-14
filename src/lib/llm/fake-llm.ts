@@ -27,7 +27,7 @@ export class FakeLlm implements LlmClient {
   /**
    * Enqueue a value that will FAIL Zod validation when chatJson is called
    * with `schema`. Useful for exercising the validation-error path without
-   * depending on the real OpenAI client.
+   * depending on the real Ollama client.
    */
   enqueueInvalid(invalid: unknown): this {
     this.queue.push({

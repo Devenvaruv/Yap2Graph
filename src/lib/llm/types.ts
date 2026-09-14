@@ -8,7 +8,7 @@ export interface ChatMessage {
 }
 
 /**
- * The pipeline-facing LLM seam. Implementations may wrap the OpenAI SDK
+ * The pipeline-facing LLM seam. Implementations may wrap local Ollama
  * (production) or return canned responses (test fakes). Callers never import
  * a specific provider — they depend on this interface only.
  *
@@ -34,7 +34,7 @@ export interface EmbeddingClient {
 export interface LlmCall {
   messages: ChatMessage[];
   purpose: string;
-  /** Empty string for the OpenAI client when the caller didn't override. */
+  /** Provider-specific model name or fake model tag in tests. */
   model: string;
 }
 
@@ -42,13 +42,11 @@ export interface LlmCall {
  * Model selection is config — the client picks the model based on `purpose`,
  * so pipeline code never names a model directly.
  */
-export interface OpenAiClientConfig {
-  apiKey: string;
+export interface OllamaClientConfig {
+  baseUrl?: string;
   smallModel?: string;
   largeModel?: string;
   embeddingModel?: string;
   /** Max additional attempts after the first call when JSON validation fails. Default 1. */
   maxRetries?: number;
-  /** Optional override of the OpenAI base URL (useful for proxies). */
-  baseUrl?: string;
 }

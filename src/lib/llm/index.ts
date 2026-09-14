@@ -4,10 +4,10 @@ export type {
   EmbeddingClient,
   LlmClient,
   LlmCall,
-  OpenAiClientConfig,
+  OllamaClientConfig,
 } from "./types";
 export { FakeEmbeddings, FakeLlm } from "./fake-llm";
 export {
-  OpenAiEmbeddingClient,
-  OpenAiLlmClient,
-} from "./openai-client";
+  OllamaEmbeddingClient,
+  OllamaLlmClient,
+} from "./ollama-client";

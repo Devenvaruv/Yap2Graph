@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { RealCogneeClient, type CogneeSearchResult, type CogneeSearchType } from "@/lib/cognee";
-import { OpenAiLlmClient } from "@/lib/llm";
+import { OllamaLlmClient } from "@/lib/llm";
 import { getReferenceProfile } from "@/lib/profiles";
 import { IntentKeySchema, TimeRangeKeySchema, TIME_RANGES } from "@/lib/reference";
 import { resolveTimeRange } from "@/lib/time-range";
@@ -116,12 +116,17 @@ async function modelDraft(params: {
   profileKey: z.infer<typeof IntentKeySchema>;
   timeRangeKey: z.infer<typeof TimeRangeKeySchema>;
   sources: readonly DraftSource[];
-  apiKey: string;
+  baseUrl: string;
+  chatModel: string;
 }): Promise<{ title: string; markdown: string }> {
-  const { profileKey, timeRangeKey, sources, apiKey } = params;
+  const { profileKey, timeRangeKey, sources, baseUrl, chatModel } = params;
   const profile = getReferenceProfile(profileKey);
   const timeRange = resolveTimeRange(timeRangeKey, new Date());
-  const llm = new OpenAiLlmClient({ apiKey });
+  const llm = new OllamaLlmClient({
+    baseUrl,
+    smallModel: chatModel,
+    largeModel: chatModel,
+  });
   const sourceText = sources
     .map(
       (source, index) =>
@@ -204,18 +209,19 @@ export async function POST(request: Request): Promise<Response> {
   }
   const sources = uniqueSources([...summaryResults.results, ...chunkResults.results]);
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const baseUrl = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434";
+  const chatModel = process.env.OLLAMA_CHAT_MODEL ?? "qwen3:4b-instruct";
   let usedModel = false;
   let modelError: string | undefined;
   let draft = fallbackDraft(parsed.data.profileKey, parsed.data.timeRangeKey, sources);
 
-  if (apiKey) {
+  if (baseUrl.trim()) {
     try {
-      draft = await modelDraft({ ...parsed.data, sources, apiKey });
+      draft = await modelDraft({ ...parsed.data, sources, baseUrl, chatModel });
       usedModel = true;
     } catch (err) {
-      console.error("OpenAI draft polish failed:", err);
-      modelError = "OpenAI polish failed; showing a Cognee extractive draft.";
+      console.error("Ollama draft polish failed:", err);
+      modelError = "Ollama polish failed; showing a Cognee extractive draft.";
     }
   }
 

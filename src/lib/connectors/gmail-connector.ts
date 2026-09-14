@@ -182,10 +182,15 @@ export class GmailConnector {
         `Token exchange failed (${response.status}): ${this.describeError(data)}`,
       );
     }
-    if (!data.access_token) {
+    if (typeof data.access_token !== "string") {
       throw new Error("Token exchange succeeded but no access token returned.");
     }
-    return data;
+    return {
+      access_token: data.access_token,
+      ...(typeof data.refresh_token === "string"
+        ? { refresh_token: data.refresh_token }
+        : {}),
+    };
   }
 
   private async refreshAccessToken(): Promise<string> {
@@ -212,7 +217,7 @@ export class GmailConnector {
         `Token refresh failed (${response.status}): ${this.describeError(data)}`,
       );
     }
-    if (!data.access_token) {
+    if (typeof data.access_token !== "string") {
       throw new Error("Token refresh succeeded but no access token returned.");
     }
     return data.access_token;

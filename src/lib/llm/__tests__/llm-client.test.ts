@@ -1,31 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { FakeEmbeddings, FakeLlm } from "../fake-llm";
-import { OpenAiEmbeddingClient, OpenAiLlmClient } from "../openai-client";
-
-const chatCreateSpy = vi.fn();
-const embeddingsCreateSpy = vi.fn();
-
-vi.mock("openai", () => {
-  class MockOpenAI {
-    chat = { completions: { create: chatCreateSpy } };
-    embeddings = { create: embeddingsCreateSpy };
-    constructor(_opts?: unknown) {
-      /* captured via the spies above */
-    }
-  }
-  return { default: MockOpenAI, __esModule: true };
-});
+import { OllamaEmbeddingClient, OllamaLlmClient } from "../ollama-client";
 
 const simpleSchema = z.object({
   title: z.string(),
   confidence: z.number(),
 });
 
+function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), {
+    status: init?.status ?? 200,
+    statusText: init?.statusText,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
-  chatCreateSpy.mockReset();
-  embeddingsCreateSpy.mockReset();
 });
 
 describe("FakeLlm", () => {
@@ -158,21 +150,14 @@ describe("FakeEmbeddings", () => {
   });
 });
 
-describe("OpenAiLlmClient", () => {
-  it("fails fast when apiKey is missing", () => {
-    expect(() => new OpenAiLlmClient({ apiKey: "" })).toThrow(
-      /apiKey is required/,
+describe("OllamaLlmClient", () => {
+  it("uses qwen3:4b-instruct by default", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        message: { content: JSON.stringify({ title: "x", confidence: 1 }) },
+      }),
     );
-    expect(() => new OpenAiLlmClient({ apiKey: "   " })).toThrow(
-      /apiKey is required/,
-    );
-  });
-
-  it("uses the small model for extraction/merge/scoring", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test" });
-    chatCreateSpy.mockResolvedValueOnce({
-      choices: [{ message: { content: JSON.stringify({ title: "x", confidence: 1 }) } }],
-    });
+    const client = new OllamaLlmClient();
 
     await client.chatJson({
       messages: [{ role: "user", content: "extract" }],
@@ -180,15 +165,24 @@ describe("OpenAiLlmClient", () => {
       purpose: "extraction",
     });
 
-    expect(chatCreateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o-mini" }),
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:11434/api/chat",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"model":"qwen3:4b-instruct"'),
+      }),
     );
   });
 
-  it("uses the large model for generation", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test" });
-    chatCreateSpy.mockResolvedValueOnce({
-      choices: [{ message: { content: JSON.stringify({ title: "x", confidence: 1 }) } }],
+  it("uses the large model for generation when configured", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({
+        message: { content: JSON.stringify({ title: "x", confidence: 1 }) },
+      }),
+    );
+    const client = new OllamaLlmClient({
+      smallModel: "qwen3:4b-instruct",
+      largeModel: "qwen3:8b",
     });
 
     await client.chatJson({
@@ -197,27 +191,29 @@ describe("OpenAiLlmClient", () => {
       purpose: "generation",
     });
 
-    expect(chatCreateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "gpt-4o" }),
-    );
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.model).toBe("qwen3:8b");
   });
 
   it("extracts JSON from ```json fenced blocks", () => {
     const raw = '```json\n{"title":"x","confidence":0.5}\n```';
-    expect(OpenAiLlmClient.extractJson(raw)).toBe(
+    expect(OllamaLlmClient.extractJson(raw)).toBe(
       '{"title":"x","confidence":0.5}',
     );
   });
 
   it("retries once when the first response fails Zod validation", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test" });
-    chatCreateSpy
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ wrong: "shape" }) } }],
-      })
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ title: "ok", confidence: 0.7 }) } }],
-      });
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({ message: { content: JSON.stringify({ wrong: "shape" }) } }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          message: { content: JSON.stringify({ title: "ok", confidence: 0.7 }) },
+        }),
+      );
+    const client = new OllamaLlmClient();
 
     const result = await client.chatJson({
       messages: [{ role: "user", content: "extract" }],
@@ -226,18 +222,19 @@ describe("OpenAiLlmClient", () => {
     });
 
     expect(result).toEqual({ title: "ok", confidence: 0.7 });
-    expect(chatCreateSpy).toHaveBeenCalledTimes(2);
-    const secondCall = chatCreateSpy.mock.calls[1][0];
-    expect(secondCall.messages[1]).toMatchObject({
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondBody = JSON.parse(fetchMock.mock.calls[1][1]?.body as string);
+    expect(secondBody.messages.at(-1)).toMatchObject({
       role: "user",
       content: expect.stringMatching(/Validation errors/),
     });
   });
 
   it("throws after exhausting the retry budget", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test", maxRetries: 1 });
-    const bad = { choices: [{ message: { content: JSON.stringify({ wrong: "shape" }) } }] };
-    chatCreateSpy.mockResolvedValue(bad);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      jsonResponse({ message: { content: JSON.stringify({ wrong: "shape" }) } }),
+    );
+    const client = new OllamaLlmClient({ maxRetries: 1 });
 
     await expect(
       client.chatJson({
@@ -246,18 +243,17 @@ describe("OpenAiLlmClient", () => {
         purpose: "extraction",
       }),
     ).rejects.toThrow(/failed schema validation after 2 attempt/);
-    expect(chatCreateSpy).toHaveBeenCalledTimes(2);
   });
 
   it("retries when the model returns non-JSON text", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test" });
-    chatCreateSpy
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: "not json at all" } }],
-      })
-      .mockResolvedValueOnce({
-        choices: [{ message: { content: JSON.stringify({ title: "ok", confidence: 1 }) } }],
-      });
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ message: { content: "not json at all" } }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          message: { content: JSON.stringify({ title: "ok", confidence: 1 }) },
+        }),
+      );
+    const client = new OllamaLlmClient();
 
     const result = await client.chatJson({
       messages: [{ role: "user", content: "extract" }],
@@ -266,36 +262,13 @@ describe("OpenAiLlmClient", () => {
     });
 
     expect(result).toEqual({ title: "ok", confidence: 1 });
-    expect(chatCreateSpy).toHaveBeenCalledTimes(2);
   });
 
-  it("respects custom model overrides", async () => {
-    const client = new OpenAiLlmClient({
-      apiKey: "sk-test",
-      smallModel: "gpt-5-mini",
-      largeModel: "gpt-5",
-    });
-    const ok = { choices: [{ message: { content: JSON.stringify({ title: "x", confidence: 1 }) } }] };
-    chatCreateSpy.mockResolvedValue(ok);
-
-    await client.chatJson({
-      messages: [{ role: "user", content: "go" }],
-      schema: simpleSchema,
-      purpose: "extraction",
-    });
-    await client.chatJson({
-      messages: [{ role: "user", content: "go" }],
-      schema: simpleSchema,
-      purpose: "generation",
-    });
-
-    expect(chatCreateSpy.mock.calls[0][0].model).toBe("gpt-5-mini");
-    expect(chatCreateSpy.mock.calls[1][0].model).toBe("gpt-5");
-  });
-
-  it("propagates SDK errors without retrying", async () => {
-    const client = new OpenAiLlmClient({ apiKey: "sk-test", maxRetries: 2 });
-    chatCreateSpy.mockRejectedValue(new Error("401 unauthorized"));
+  it("propagates request errors without retrying", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("connection refused"));
+    const client = new OllamaLlmClient({ maxRetries: 2 });
 
     await expect(
       client.chatJson({
@@ -303,50 +276,47 @@ describe("OpenAiLlmClient", () => {
         schema: simpleSchema,
         purpose: "extraction",
       }),
-    ).rejects.toThrow("401 unauthorized");
-    expect(chatCreateSpy).toHaveBeenCalledTimes(1);
+    ).rejects.toThrow("connection refused");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
-describe("OpenAiEmbeddingClient", () => {
-  it("fails fast when apiKey is missing", () => {
-    expect(() => new OpenAiEmbeddingClient({ apiKey: "" })).toThrow(
-      /apiKey is required/,
+describe("OllamaEmbeddingClient", () => {
+  it("uses nomic-embed-text:latest by default", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2, 0.3]] }));
+    const client = new OllamaEmbeddingClient();
+    await client.embed(["hello"]);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://localhost:11434/api/embed",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"model":"nomic-embed-text:latest"'),
+      }),
     );
   });
 
-  it("uses text-embedding-3-small by default", async () => {
-    embeddingsCreateSpy.mockResolvedValueOnce({
-      data: [{ embedding: [0.1, 0.2, 0.3] }],
-    });
-    const client = new OpenAiEmbeddingClient({ apiKey: "sk-test" });
-    await client.embed(["hello"]);
-
-    expect(embeddingsCreateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "text-embedding-3-small", input: ["hello"] }),
-    );
-  });
-
-  it("honours a custom embedding model", async () => {
-    embeddingsCreateSpy.mockResolvedValueOnce({
-      data: [{ embedding: [0.1, 0.2, 0.3] }],
-    });
-    const client = new OpenAiEmbeddingClient({
-      apiKey: "sk-test",
-      embeddingModel: "text-embedding-3-large",
+  it("honors a custom embedding model", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ embeddings: [[0.1, 0.2, 0.3]] }));
+    const client = new OllamaEmbeddingClient({
+      embeddingModel: "nomic-embed-text",
     });
     await client.embed(["hello"]);
 
-    expect(embeddingsCreateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ model: "text-embedding-3-large" }),
-    );
+    const body = JSON.parse(fetchMock.mock.calls[0][1]?.body as string);
+    expect(body.model).toBe("nomic-embed-text");
   });
 
   it("short-circuits on an empty input array", async () => {
-    const client = new OpenAiEmbeddingClient({ apiKey: "sk-test" });
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const client = new OllamaEmbeddingClient();
     const result = await client.embed([]);
 
     expect(result).toEqual([]);
-    expect(embeddingsCreateSpy).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
